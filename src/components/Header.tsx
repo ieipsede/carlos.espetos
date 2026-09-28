@@ -1,12 +1,10 @@
 import React from 'react';
-import { Wrench } from 'lucide-react';
 
 interface HeaderProps {
-  onOpenTestTools: () => void;
   onOpenPhpModal: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onOpenTestTools, onOpenPhpModal }) => {
+export const Header: React.FC<HeaderProps> = ({ onOpenPhpModal }) => {
   return (
     <header className="pt-4 pb-2 text-center relative">
       <div className="absolute right-0 top-3 flex items-center gap-2">
@@ -17,14 +15,6 @@ export const Header: React.FC<HeaderProps> = ({ onOpenTestTools, onOpenPhpModal 
         >
           <span className="font-mono text-purple-400">&lt;?php</span>
           <span className="hidden sm:inline">index.php</span>
-        </button>
-        <button
-          onClick={onOpenTestTools}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700 transition"
-          title="Ferramentas de Teste e Manutenção"
-        >
-          <Wrench className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Modo Teste</span>
         </button>
       </div>
 

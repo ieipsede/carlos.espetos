@@ -17,7 +17,6 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({
   const formRef = useRef<HTMLFormElement>(null);
 
   const hoje = new Date().toISOString().split('T')[0];
-  const quinzeDiasDepois = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
   const [unidade, setUnidade] = useState<number>(unidadeInicial === 0 ? 1 : unidadeInicial);
   const [fornecedor, setFornecedor] = useState('');
@@ -26,15 +25,34 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({
   const [valorTotal, setValorTotal] = useState<number | ''>('');
   const [formaPagamento, setFormaPagamento] = useState<FormaPagamento>('BOLETO');
   const [dataCompra, setDataCompra] = useState(hoje);
-  const [vencimentoBase, setVencimentoBase] = useState(quinzeDiasDepois);
   const [status, setStatus] = useState<StatusCompra>('PENDENTE');
   const [qtdParcelas, setQtdParcelas] = useState<number>(1);
   const [intervaloDias, setIntervaloDias] = useState<number>(30);
+  const [vencimentosCustom, setVencimentosCustom] = useState<string[]>([]);
   const [observacoes, setObservacoes] = useState('');
   const [numeroNF, setNumeroNF] = useState('');
   const [erro, setErro] = useState<string | null>(null);
 
   const ehAPrazo = formaPagamento === 'BOLETO' || formaPagamento === 'FATURADO';
+
+  // Atualiza dinamicamente as datas das parcelas
+  useEffect(() => {
+    if (!ehAPrazo) return;
+    const baseDate = new Date(`${dataCompra}T00:00:00`);
+    setVencimentosCustom(prev => {
+      const novasDatas: string[] = [];
+      for (let i = 1; i <= qtdParcelas; i++) {
+        if (prev[i - 1]) {
+          novasDatas.push(prev[i - 1]);
+        } else {
+          const dt = new Date(baseDate);
+          dt.setDate(dt.getDate() + i * intervaloDias);
+          novasDatas.push(dt.toISOString().split('T')[0]);
+        }
+      }
+      return novasDatas;
+    });
+  }, [dataCompra, qtdParcelas, intervaloDias, ehAPrazo]);
 
   // Navegação inteligente por tecla ENTER entre campos
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -85,7 +103,6 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({
     const parcelarDeFato = ehAPrazo && qtdParcelas > 1;
 
     const baseDate = new Date(`${dataCompra}T00:00:00`);
-    const vencBaseDate = new Date(`${vencimentoBase}T00:00:00`);
 
     if (parcelarDeFato) {
       const valorBase = Math.round((val / qtdParcelas) * 100) / 100;
@@ -93,8 +110,11 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({
 
       for (let i = 1; i <= qtdParcelas; i++) {
         const valParc = i === qtdParcelas ? valorBase + diferencaCentavos : valorBase;
-        const vencParc = new Date(vencBaseDate);
-        vencParc.setDate(vencParc.getDate() + (i - 1) * intervaloDias);
+        const vencParc = vencimentosCustom[i - 1] || (() => {
+          const dt = new Date(baseDate);
+          dt.setDate(dt.getDate() + i * intervaloDias);
+          return dt.toISOString().split('T')[0];
+        })();
 
         const descFinal = `${descricao.trim()} (${i}/${qtdParcelas})`;
         const nfFinal = numeroNF.trim() ? `${numeroNF.trim()} - Parc. ${i}/${qtdParcelas}` : `Parc. ${i}/${qtdParcelas}`;
@@ -103,7 +123,7 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({
         novasCompras.push({
           estabelecimento_id: unidade,
           data: dataCompra,
-          vencimento: vencParc.toISOString().split('T')[0],
+          vencimento: vencParc,
           descricao: descFinal,
           fornecedor: fornecedor.trim(),
           categoria,
@@ -115,7 +135,14 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({
         });
       }
     } else {
-      const vencFinal = ehAPrazo ? vencimentoBase : dataCompra;
+      let vencFinal = dataCompra;
+      if (ehAPrazo) {
+        vencFinal = vencimentosCustom[0] || (() => {
+          const vencObj = new Date(baseDate);
+          vencObj.setDate(vencObj.getDate() + intervaloDias);
+          return vencObj.toISOString().split('T')[0];
+        })();
+      }
       novasCompras.push({
         estabelecimento_id: unidade,
         data: dataCompra,
@@ -316,51 +343,23 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({
               </select>
             </div>
 
-            {/* Condicional de Datas */}
-            {ehAPrazo ? (
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
-                    📅 Data Compra *
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    value={dataCompra}
-                    onChange={e => setDataCompra(e.target.value)}
-                    className="w-full bg-[#0F172A] border border-slate-700 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
-                    ⏰ 1º Vencimento *
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    value={vencimentoBase}
-                    onChange={e => setVencimentoBase(e.target.value)}
-                    className="w-full bg-[#0F172A] border border-slate-700 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
+                📅 Data da Compra *
+              </label>
+              <input
+                type="date"
+                required
+                value={dataCompra}
+                onChange={e => setDataCompra(e.target.value)}
+                className="w-full bg-[#0F172A] border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <div className="text-[11px] text-slate-400 mt-1 italic">
+                {ehAPrazo
+                  ? `ℹ️ O vencimento é calculado automaticamente com base no intervalo selecionado (ex: a cada ${intervaloDias} dias após a compra).`
+                  : 'ℹ️ Forma à vista: vencimento e quitação automáticos na data da compra.'}
               </div>
-            ) : (
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
-                  📅 Data da Compra *
-                </label>
-                <input
-                  type="date"
-                  required
-                  value={dataCompra}
-                  onChange={e => setDataCompra(e.target.value)}
-                  className="w-full bg-[#0F172A] border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <div className="text-[11px] text-slate-400 mt-1 italic">
-                  ℹ️ Forma à vista: vencimento e quitação automáticos na data da compra.
-                </div>
-              </div>
-            )}
+            </div>
 
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
@@ -420,6 +419,53 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({
                   <option value={45}>A cada 45 dias</option>
                   <option value={60}>A cada 60 dias (Bimestral)</option>
                 </select>
+              </div>
+            </div>
+
+            {/* Lista Dinâmica de Datas Individuais por Parcela/Boleto */}
+            <div className="pt-4 border-t border-slate-800 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                <label className="text-xs font-bold uppercase tracking-wider text-blue-400 block">
+                  📅 Vencimento Individual por Parcela / Boleto
+                </label>
+                <span className="text-[11px] text-slate-400">Datas calculadas automaticamente (ajuste manual livre)</span>
+              </div>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                O sistema pré-preenche as datas com base na data da compra + intervalo de {intervaloDias} dias. Você pode alterar a data individual de cada parcela abaixo se o boleto/carnê real tiver vencimento divergente:
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                {Array.from({ length: qtdParcelas }, (_, idx) => {
+                  const num = idx + 1;
+                  const dataAtual = vencimentosCustom[idx] || '';
+                  return (
+                    <div
+                      key={num}
+                      className="bg-[#0F172A] border border-slate-700/80 rounded-xl p-3 space-y-1.5 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition"
+                    >
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-extrabold text-slate-200">
+                          📄 {qtdParcelas > 1 ? `Boleto ${num}/${qtdParcelas}` : 'Boleto / Parcela Única'}
+                        </span>
+                        <span className="text-[10px] text-blue-400 font-mono">+{num * intervaloDias}d</span>
+                      </div>
+                      <input
+                        type="date"
+                        required
+                        value={dataAtual}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setVencimentosCustom(prev => {
+                            const arr = [...prev];
+                            arr[idx] = val;
+                            return arr;
+                          });
+                        }}
+                        className="w-full bg-[#111827] border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs sm:text-sm text-slate-100 font-mono focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>

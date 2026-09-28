@@ -237,15 +237,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'salvar_compra') {
     $valorTotal = (float)str_replace(',', '.', str_replace('.', '', $_POST['valor'] ?? '0'));
     $formaPagamento = trim($_POST['forma_pagamento'] ?? 'BOLETO');
     $dataCompra = trim($_POST['data_compra'] ?? date('Y-m-d'));
-    $vencimentoBase = trim($_POST['vencimento_base'] ?? date('Y-m-d', strtotime('+15 days')));
     $statusInicial = trim($_POST['status'] ?? 'PENDENTE');
     $qtdParcelas = max(1, min(36, (int)($_POST['qtd_parcelas'] ?? 1)));
     $intervaloDias = (int)($_POST['intervalo_dias'] ?? 30);
+    if ($intervaloDias <= 0) $intervaloDias = 30;
     $observacoes = trim($_POST['observacoes'] ?? '');
     $numeroNF = trim($_POST['numero_nf'] ?? '');
 
     $ehAPrazo = in_array($formaPagamento, ['BOLETO', 'FATURADO']);
     $parcelarDeFato = $ehAPrazo && ($qtdParcelas > 1);
+
+    $vencimentosCustom = $_POST['vencimentos'] ?? [];
+    if (!is_array($vencimentosCustom)) {
+        $vencimentosCustom = [];
+    }
 
     if ($estabelecimento_id <= 0) {
         $_SESSION['flash_erro'] = "⚠️ Por favor, selecione um estabelecimento válido.";
@@ -266,16 +271,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'salvar_compra') {
     if ($parcelarDeFato) {
         $valorBase = round($valorTotal / $qtdParcelas, 2);
         $diferencaCentavos = round($valorTotal - ($valorBase * $qtdParcelas), 2);
-        $dataVencBase = new DateTime($vencimentoBase);
+        $dataCompraObj = new DateTime($dataCompra);
 
         for ($i = 1; $i <= $qtdParcelas; $i++) {
             $valParc = ($i === $qtdParcelas) ? ($valorBase + $diferencaCentavos) : $valorBase;
-            $dtVenc = clone $dataVencBase;
-            if ($i > 1) {
-                $diasAdd = ($i - 1) * $intervaloDias;
+
+            // Usa a data customizada preenchida pelo usuário se existir; caso contrário, data calculada
+            if (!empty($vencimentosCustom[$i - 1])) {
+                $vencIso = trim($vencimentosCustom[$i - 1]);
+            } else {
+                $dtVenc = clone $dataCompraObj;
+                $diasAdd = $i * $intervaloDias;
                 $dtVenc->modify("+{$diasAdd} days");
+                $vencIso = $dtVenc->format('Y-m-d');
             }
-            $vencIso = $dtVenc->format('Y-m-d');
+
             $descFinal = "{$descricao} ({$i}/{$qtdParcelas})";
             $nfFinal = !empty($numeroNF) ? "{$numeroNF} - Parc. {$i}/{$qtdParcelas}" : "Parc. {$i}/{$qtdParcelas}";
             $obsFinal = trim("Boleto/Parcela {$i} de {$qtdParcelas}. {$observacoes}");
@@ -287,7 +297,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'salvar_compra') {
         }
         $_SESSION['flash_msg'] = "✅ Sucesso! {$qtdParcelas} boletos cadastrados com sucesso!";
     } else {
-        $vencFinal = $ehAPrazo ? $vencimentoBase : $dataCompra;
+        if ($ehAPrazo) {
+            if (!empty($vencimentosCustom[0])) {
+                $vencFinal = trim($vencimentosCustom[0]);
+            } else {
+                $dtVenc = new DateTime($dataCompra);
+                $dtVenc->modify("+{$intervaloDias} days");
+                $vencFinal = $dtVenc->format('Y-m-d');
+            }
+        } else {
+            $vencFinal = $dataCompra;
+        }
         $stmt->execute([
             $estabelecimento_id, $dataCompra, $vencFinal, $descricao, $fornecedor,
             $categoria, $valorTotal, $formaPagamento, $statusInicial, $numeroNF, $observacoes
@@ -453,12 +473,6 @@ unset($_SESSION['flash_msg'], $_SESSION['flash_type'], $_SESSION['flash_erro']);
 
         <!-- CABEÇALHO DO SISTEMA -->
         <header class="text-center pt-2 pb-4 relative">
-            <div class="absolute right-0 top-2">
-                <button onclick="document.getElementById('modal-teste').classList.remove('hidden')" 
-                        class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200 transition">
-                    🧪 Modo Teste
-                </button>
-            </div>
             <h1 class="text-4xl sm:text-5xl md:text-6xl font-black tracking-widest uppercase brand-gradient mb-1">CARLÃO</h1>
             <div class="text-slate-400 text-xs sm:text-sm font-semibold tracking-widest uppercase mb-5">
                 SISTEMA INTEGRADO DE GESTÃO DE COMPRAS
@@ -595,20 +609,14 @@ unset($_SESSION['flash_msg'], $_SESSION['flash_type'], $_SESSION['flash_erro']);
                                 </select>
                             </div>
 
-                            <div id="box-datas-prazo" class="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
-                                        📅 Data Compra *
-                                    </label>
-                                    <input type="date" name="data_compra" value="<?= date('Y-m-d') ?>" required
-                                           class="w-full bg-[#0F172A] border border-slate-700 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-100">
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
-                                        ⏰ 1º Vencimento *
-                                    </label>
-                                    <input type="date" name="vencimento_base" value="<?= date('Y-m-d', strtotime('+15 days')) ?>" required
-                                           class="w-full bg-[#0F172A] border border-slate-700 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-100">
+                            <div>
+                                <label class="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
+                                    📅 Data da Compra *
+                                </label>
+                                <input type="date" name="data_compra" value="<?= date('Y-m-d') ?>" required
+                                       class="w-full bg-[#0F172A] border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:ring-2 focus:ring-blue-500">
+                                <div class="text-[11px] text-slate-400 mt-1 italic">
+                                    ℹ️ O vencimento é calculado automaticamente com base na data de compra e no intervalo selecionado (ex: a cada 30 dias).
                                 </div>
                             </div>
 
@@ -632,18 +640,34 @@ unset($_SESSION['flash_msg'], $_SESSION['flash_type'], $_SESSION['flash_erro']);
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-xs text-slate-400 mb-1">Quantidade de Boletos / Parcelas (1 a 36)</label>
-                                <input type="number" name="qtd_parcelas" min="1" max="36" value="1"
-                                       class="w-full bg-[#0F172A] border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100">
+                                <input type="number" id="qtd-parcelas" name="qtd_parcelas" min="1" max="36" value="1" onchange="renderizarDatasParcelas()" oninput="renderizarDatasParcelas()"
+                                       class="w-full bg-[#0F172A] border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:ring-2 focus:ring-blue-500">
                             </div>
                             <div>
                                 <label class="block text-xs text-slate-400 mb-1">Intervalo entre Vencimentos</label>
-                                <select name="intervalo_dias" class="w-full bg-[#0F172A] border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100">
+                                <select id="intervalo-dias" name="intervalo_dias" onchange="renderizarDatasParcelas()" class="w-full bg-[#0F172A] border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:ring-2 focus:ring-blue-500">
                                     <option value="30">A cada 30 dias (Padrão comercial 30/60/90...)</option>
                                     <option value="15">A cada 15 dias (Quinzenal)</option>
                                     <option value="7">A cada 7 dias (Semanal)</option>
                                     <option value="45">A cada 45 dias</option>
                                     <option value="60">A cada 60 dias (Bimestral)</option>
                                 </select>
+                            </div>
+                        </div>
+
+                        <!-- Lista Dinâmica de Datas Individuais por Parcela/Boleto -->
+                        <div id="box-datas-individuais" class="pt-4 border-t border-slate-800 space-y-3">
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                                <label class="text-xs font-bold uppercase tracking-wider text-blue-400 block">
+                                    📅 Vencimento Individual por Parcela / Boleto
+                                </label>
+                                <span class="text-[11px] text-slate-400">Datas calculadas automaticamente (ajuste manual livre)</span>
+                            </div>
+                            <p class="text-[11px] text-slate-400 leading-relaxed">
+                                O sistema pré-preenche as datas com base na data da compra + intervalo de 30 dias (ou selecionado). Você pode alterar a data individual de cada parcela abaixo se o boleto real tiver vencimento diferente:
+                            </p>
+                            <div id="grid-vencimentos" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                                <!-- Preenchido dinamicamente via JavaScript -->
                             </div>
                         </div>
                     </div>
@@ -673,11 +697,66 @@ unset($_SESSION['flash_msg'], $_SESSION['flash_type'], $_SESSION['flash_erro']);
             </div>
 
             <script>
+                function renderizarDatasParcelas() {
+                    const dataCompraInput = document.querySelector('input[name="data_compra"]');
+                    const qtdInput = document.getElementById('qtd-parcelas');
+                    const intervaloSelect = document.getElementById('intervalo-dias');
+                    const grid = document.getElementById('grid-vencimentos');
+                    if (!grid) return;
+
+                    const qtd = Math.max(1, Math.min(36, parseInt(qtdInput ? qtdInput.value : 1) || 1));
+                    const intervalo = parseInt(intervaloSelect ? intervaloSelect.value : 30) || 30;
+                    const dataCompraVal = dataCompraInput ? dataCompraInput.value : '';
+
+                    // Salvar valores já editados pelo usuário
+                    const inputsAtuais = grid.querySelectorAll('input[name="vencimentos[]"]');
+                    const valoresSalvos = [];
+                    inputsAtuais.forEach(inp => valoresSalvos.push(inp.value));
+
+                    grid.innerHTML = '';
+
+                    const baseDate = dataCompraVal ? new Date(dataCompraVal + 'T00:00:00') : new Date();
+
+                    for (let i = 1; i <= qtd; i++) {
+                        const itemDate = new Date(baseDate);
+                        itemDate.setDate(itemDate.getDate() + (i * intervalo));
+                        const y = itemDate.getFullYear();
+                        const m = String(itemDate.getMonth() + 1).padStart(2, '0');
+                        const d = String(itemDate.getDate()).padStart(2, '0');
+                        const defaultDate = `${y}-${m}-${d}`;
+
+                        const valorFinal = (valoresSalvos[i - 1]) ? valoresSalvos[i - 1] : defaultDate;
+
+                        const card = document.createElement('div');
+                        card.className = 'bg-[#0F172A] border border-slate-700/80 rounded-xl p-3 space-y-1.5 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition';
+                        card.innerHTML = `
+                            <div class="flex items-center justify-between text-xs">
+                                <span class="font-extrabold text-slate-200">
+                                    📄 ${qtd > 1 ? 'Boleto ' + i + '/' + qtd : 'Boleto / Parcela Única'}
+                                </span>
+                                <span class="text-[10px] text-blue-400 font-mono">+${i * intervalo}d</span>
+                            </div>
+                            <input type="date" name="vencimentos[]" value="${valorFinal}" required
+                                   class="w-full bg-[#111827] border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs sm:text-sm text-slate-100 font-mono focus:outline-none focus:border-blue-500">
+                        `;
+                        grid.appendChild(card);
+                    }
+                }
+
                 function toggleParcelas() {
                     const sel = document.getElementById('forma-pagto').value;
                     const ehPrazo = (sel === 'BOLETO' || sel === 'FATURADO');
                     document.getElementById('box-parcelamento').style.display = ehPrazo ? 'block' : 'none';
+                    if (ehPrazo) {
+                        renderizarDatasParcelas();
+                    }
                 }
+
+                const dtCompraEl = document.querySelector('input[name="data_compra"]');
+                if (dtCompraEl) {
+                    dtCompraEl.addEventListener('change', renderizarDatasParcelas);
+                }
+
                 toggleParcelas();
 
                 // Navegação com tecla ENTER entre campos de formulário
@@ -1013,40 +1092,7 @@ unset($_SESSION['flash_msg'], $_SESSION['flash_type'], $_SESSION['flash_erro']);
                 <strong class="text-slate-400">CARLÃO - SISTEMA INTEGRADO DE GESTÃO DE COMPRAS (PHP)</strong>
                 <div>Unidades: 🍽️ Restaurante | 🏪 Conveniência | 🎉 Buffet • Ambiente: <?= $isVercel ? 'Vercel Serverless (/tmp/gestao_compras.db)' : 'Servidor Web Local' ?></div>
             </div>
-            <div>
-                <button onclick="document.getElementById('modal-teste').classList.remove('hidden')" class="underline hover:text-slate-300">
-                    Ferramentas de Teste
-                </button>
-            </div>
         </footer>
-
-        <!-- MODAL DE FERRAMENTAS DE TESTE -->
-        <div id="modal-teste" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 hidden">
-            <div class="bg-[#111827] border border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-6 shadow-2xl relative">
-                <button onclick="document.getElementById('modal-teste').classList.add('hidden')" class="absolute right-5 top-5 text-slate-400 hover:text-white">&times;</button>
-                <h3 class="text-xl font-black text-slate-100">🧪 Ferramentas de Teste & Manutenção</h3>
-
-                <div class="bg-red-950/20 border border-red-500/30 rounded-2xl p-5 space-y-3">
-                    <h4 class="text-sm font-bold text-red-400">⚠️ Zerar Todos os Registros (DELETE FROM compras)</h4>
-                    <p class="text-xs text-slate-300">Esta ação apagará todas as compras e resetará o auto-incremento de ID.</p>
-                    <form method="POST" action="<?= $baseUrl ?>?action=zerar_db" onsubmit="return confirm('Confirma limpeza total do banco de dados?')">
-                        <button type="submit" class="w-full py-2.5 px-4 rounded-xl text-xs font-black bg-red-600 hover:bg-red-500 text-white transition">
-                            EXECUTAR LIMPEZA TOTAL
-                        </button>
-                    </form>
-                </div>
-
-                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3">
-                    <h4 class="text-sm font-bold text-blue-400">🔄 Restaurar Amostras Iniciais</h4>
-                    <p class="text-xs text-slate-300">Recarrega a massa padrão de compras e boletos das 3 unidades.</p>
-                    <form method="POST" action="<?= $baseUrl ?>?action=restaurar_db">
-                        <button type="submit" class="w-full py-2.5 px-4 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition">
-                            Restaurar Dados Amostrais
-                        </button>
-                    </form>
-                </div>
-            </div>
-        </div>
 
     </div>
 </body>

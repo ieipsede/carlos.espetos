@@ -4,9 +4,7 @@ import {
   getComprasFromStorage,
   updateStatusCompra,
   deleteCompra,
-  addMultiplasCompras,
-  zerarBancoDados,
-  popularDadosIniciais
+  addMultiplasCompras
 } from './services/db';
 import { Header } from './components/Header';
 import { Navigation } from './components/Navigation';
@@ -15,7 +13,6 @@ import { NextDueCard } from './components/NextDueCard';
 import { RecordsTable } from './components/RecordsTable';
 import { AnalyticsCharts } from './components/AnalyticsCharts';
 import { PurchaseForm } from './components/PurchaseForm';
-import { TestToolsModal } from './components/TestToolsModal';
 import { PhpSourceModal } from './components/PhpSourceModal';
 import { CheckCircle2, X } from 'lucide-react';
 
@@ -24,7 +21,6 @@ export const App: React.FC = () => {
   const [unidadeSelecionada, setUnidadeSelecionada] = useState<number>(0);
   const [viewMode, setViewMode] = useState<ViewMode>('painel');
   const [activeTab, setActiveTab] = useState<'vencimento' | 'records' | 'charts'>('vencimento');
-  const [isTestToolsOpen, setIsTestToolsOpen] = useState(false);
   const [isPhpModalOpen, setIsPhpModalOpen] = useState(false);
   const [msgSucesso, setMsgSucesso] = useState<string | null>(null);
 
@@ -76,30 +72,11 @@ export const App: React.FC = () => {
     setMsgSucesso(mensagem);
   };
 
-  // Zerar banco
-  const handleZerarBanco = () => {
-    const vazio = zerarBancoDados();
-    setCompras(vazio);
-    setUnidadeSelecionada(0);
-    setViewMode('painel');
-    setMsgSucesso('✅ Banco de dados zerado com sucesso! Todos os registros foram apagados.');
-  };
-
-  // Restaurar dados
-  const handleRestaurarDados = () => {
-    const massa = popularDadosIniciais();
-    setCompras(massa);
-    setUnidadeSelecionada(0);
-    setViewMode('painel');
-    setMsgSucesso('✅ Dados de demonstração restaurados com sucesso!');
-  };
-
   return (
     <div className="min-h-screen bg-[#0A0E17] text-[#E2E8F0] selection:bg-blue-600 selection:text-white">
       <div className="max-w-[1300px] mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
         {/* Cabeçalho Oficial Carlão */}
         <Header 
-          onOpenTestTools={() => setIsTestToolsOpen(true)}
           onOpenPhpModal={() => setIsPhpModalOpen(true)}
         />
 
@@ -217,24 +194,7 @@ export const App: React.FC = () => {
             <strong className="text-slate-400">CARLÃO - SISTEMA INTEGRADO DE GESTÃO DE COMPRAS</strong>
             <div>Unidades: 🍽️ Restaurante | 🏪 Conveniência | 🎉 Buffet</div>
           </div>
-
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setIsTestToolsOpen(true)}
-              className="text-slate-400 hover:text-slate-200 transition underline underline-offset-4"
-            >
-              Modo Teste & Amostras
-            </button>
-          </div>
         </footer>
-
-        {/* Modal de Ferramentas de Teste */}
-        <TestToolsModal
-          isOpen={isTestToolsOpen}
-          onClose={() => setIsTestToolsOpen(false)}
-          onZerar={handleZerarBanco}
-          onRestaurar={handleRestaurarDados}
-        />
 
         {/* Modal de Código PHP */}
         <PhpSourceModal
