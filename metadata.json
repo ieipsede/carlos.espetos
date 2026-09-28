@@ -1,0 +1,6 @@
+{
+  "name": "CARLÃO - Sistema Integrado de Gestão de Compras",
+  "description": "Sistema Integrado de Gestão de Compras do Grupo Carlão: 1. Restaurante, 2. Conveniência e 3. Buffet.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

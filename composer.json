@@ -1,0 +1,18 @@
+{
+  "name": "carlao/gestao-compras",
+  "description": "Sistema Integrado de Gestão de Compras do Grupo Carlão em PHP",
+  "type": "project",
+  "license": "MIT",
+  "require": {
+    "php": "^7.4 || ^8.0 || ^8.1 || ^8.2 || ^8.3",
+    "ext-pdo": "*",
+    "ext-pdo_sqlite": "*",
+    "ext-json": "*",
+    "ext-session": "*"
+  },
+  "config": {
+    "optimize-autoloader": true,
+    "preferred-install": "dist",
+    "sort-packages": true
+  }
+}
