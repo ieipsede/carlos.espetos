@@ -25,6 +25,7 @@ export const CATEGORIAS_PADRAO = [
 
 const STORAGE_KEY = 'carlao_compras_db_v1';
 const AUTO_INC_KEY = 'carlao_compras_seq_v1';
+export const DB_CLEARED_FLAG = 'carlao_db_zerado_v1';
 
 function formatDate(d: Date): string {
   return d.toISOString().split('T')[0];
@@ -263,7 +264,19 @@ function enrichCompra(c: Compra): Compra {
 
 export function getComprasFromStorage(): Compra[] {
   if (typeof window === 'undefined') return [];
+  const foiZerado = localStorage.getItem(DB_CLEARED_FLAG) === 'true';
   const raw = localStorage.getItem(STORAGE_KEY);
+
+  if (foiZerado) {
+    if (!raw || raw === '[]') return [];
+    try {
+      const parsed: Compra[] = JSON.parse(raw);
+      return parsed.map(enrichCompra);
+    } catch {
+      return [];
+    }
+  }
+
   if (!raw) {
     const iniciais = gerarMassaInicial();
     localStorage.setItem(STORAGE_KEY, JSON.stringify(iniciais));
@@ -326,6 +339,7 @@ export function zerarBancoDados(): Compra[] {
   if (typeof window !== 'undefined') {
     localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
     localStorage.setItem(AUTO_INC_KEY, '1');
+    localStorage.setItem(DB_CLEARED_FLAG, 'true');
   }
   return [];
 }
@@ -335,6 +349,7 @@ export function popularDadosIniciais(): Compra[] {
   if (typeof window !== 'undefined') {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(massa));
     localStorage.setItem(AUTO_INC_KEY, '14');
+    localStorage.removeItem(DB_CLEARED_FLAG);
   }
   return massa.map(enrichCompra);
 }

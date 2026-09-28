@@ -1,16 +1,30 @@
 import React from 'react';
+import { Trash2 } from 'lucide-react';
 
 interface HeaderProps {
   onOpenPhpModal: () => void;
+  onOpenClearModal: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onOpenPhpModal }) => {
+export const Header: React.FC<HeaderProps> = ({
+  onOpenPhpModal,
+  onOpenClearModal
+}) => {
   return (
     <header className="pt-4 pb-2 text-center relative">
       <div className="absolute right-0 top-3 flex items-center gap-2">
         <button
+          onClick={onOpenClearModal}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-red-950/40 border border-red-500/40 text-red-300 hover:bg-red-900/50 hover:text-white transition shadow-sm"
+          title="Zerar todos os registros de compras"
+        >
+          <Trash2 className="w-3.5 h-3.5 text-red-400" />
+          <span>Zerar Dados</span>
+        </button>
+
+        <button
           onClick={onOpenPhpModal}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-purple-950/40 border border-purple-500/40 text-purple-300 hover:bg-purple-900/50 hover:text-white transition"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-purple-950/40 border border-purple-500/40 text-purple-300 hover:bg-purple-900/50 hover:text-white transition"
           title="Ver e Baixar index.php"
         >
           <span className="font-mono text-purple-400">&lt;?php</span>

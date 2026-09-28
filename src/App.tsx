@@ -4,7 +4,9 @@ import {
   getComprasFromStorage,
   updateStatusCompra,
   deleteCompra,
-  addMultiplasCompras
+  addMultiplasCompras,
+  zerarBancoDados,
+  popularDadosIniciais
 } from './services/db';
 import { Header } from './components/Header';
 import { Navigation } from './components/Navigation';
@@ -14,6 +16,7 @@ import { RecordsTable } from './components/RecordsTable';
 import { AnalyticsCharts } from './components/AnalyticsCharts';
 import { PurchaseForm } from './components/PurchaseForm';
 import { PhpSourceModal } from './components/PhpSourceModal';
+import { ClearDatabaseModal } from './components/ClearDatabaseModal';
 import { CheckCircle2, X } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -22,6 +25,7 @@ export const App: React.FC = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('painel');
   const [activeTab, setActiveTab] = useState<'vencimento' | 'records' | 'charts'>('vencimento');
   const [isPhpModalOpen, setIsPhpModalOpen] = useState(false);
+  const [isClearModalOpen, setIsClearModalOpen] = useState(false);
   const [msgSucesso, setMsgSucesso] = useState<string | null>(null);
 
   // Inicializa dados do localStorage
@@ -35,6 +39,20 @@ export const App: React.FC = () => {
     if (unidadeSelecionada === 0) return compras;
     return compras.filter(c => c.estabelecimento_id === unidadeSelecionada);
   }, [compras, unidadeSelecionada]);
+
+  // Ação de Limpar Todos os Dados (DELETE FROM compras) e recarregar zerado
+  const handleConfirmClear = () => {
+    try {
+      const formData = new FormData();
+      formData.append('action', 'limpar_dados');
+      fetch('/index.php', { method: 'POST', body: formData }).catch(() => {});
+    } catch {
+      // Ignora erro em modo SPA puro
+    }
+    zerarBancoDados();
+    setIsClearModalOpen(false);
+    window.location.reload();
+  };
 
   // Ação de Dar Baixa em um lançamento
   const handleDarBaixa = (id: number) => {
@@ -78,6 +96,7 @@ export const App: React.FC = () => {
         {/* Cabeçalho Oficial Carlão */}
         <Header 
           onOpenPhpModal={() => setIsPhpModalOpen(true)}
+          onOpenClearModal={() => setIsClearModalOpen(true)}
         />
 
         {/* Mensagem de Feedback Flutuante / Banner */}
@@ -175,6 +194,7 @@ export const App: React.FC = () => {
                   compras={comprasFiltradas}
                   onToggleStatus={handleToggleStatus}
                   onDeleteCompra={handleDeleteCompra}
+                  onOpenClearModal={() => setIsClearModalOpen(true)}
                 />
               )}
 
@@ -200,6 +220,14 @@ export const App: React.FC = () => {
         <PhpSourceModal
           isOpen={isPhpModalOpen}
           onClose={() => setIsPhpModalOpen(false)}
+        />
+
+        {/* Modal de Zerar Dados (DELETE FROM compras) */}
+        <ClearDatabaseModal
+          isOpen={isClearModalOpen}
+          onClose={() => setIsClearModalOpen(false)}
+          onConfirmClear={handleConfirmClear}
+          totalRegistros={compras.length}
         />
       </div>
     </div>

@@ -7,12 +7,14 @@ interface RecordsTableProps {
   compras: Compra[];
   onToggleStatus: (id: number, currentStatus: StatusCompra) => void;
   onDeleteCompra: (id: number) => void;
+  onOpenClearModal?: () => void;
 }
 
 export const RecordsTable: React.FC<RecordsTableProps> = ({
   compras,
   onToggleStatus,
-  onDeleteCompra
+  onDeleteCompra,
+  onOpenClearModal
 }) => {
   const [busca, setBusca] = useState('');
   const [filtroStatus, setFiltroStatus] = useState<string>('TODOS');
@@ -83,14 +85,27 @@ export const RecordsTable: React.FC<RecordsTableProps> = ({
           </p>
         </div>
 
-        <button
-          onClick={() => exportToCSV(filtrados)}
-          disabled={filtrados.length === 0}
-          className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
-        >
-          <Download className="w-4 h-4 text-emerald-400" />
-          <span>Exportar Planilha (CSV)</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {onOpenClearModal && (
+            <button
+              onClick={onOpenClearModal}
+              className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-red-950/30 hover:bg-red-900/50 text-red-300 border border-red-500/40 transition shadow-sm"
+              title="Zerar todos os registros de compras"
+            >
+              <Trash2 className="w-4 h-4 text-red-400" />
+              <span>Zerar Dados</span>
+            </button>
+          )}
+
+          <button
+            onClick={() => exportToCSV(filtrados)}
+            disabled={filtrados.length === 0}
+            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+          >
+            <Download className="w-4 h-4 text-emerald-400" />
+            <span>Exportar Planilha (CSV)</span>
+          </button>
+        </div>
       </div>
 
       {/* Barra de Filtros */}

@@ -228,6 +228,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'excluir') {
     exit;
 }
 
+// 3.1 ROTA POST: ZERAR DADOS (DELETE FROM compras)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($action === 'zerar_db' || $action === 'limpar_dados')) {
+    $db->exec("DELETE FROM compras;");
+    try {
+        $db->exec("DELETE FROM sqlite_sequence WHERE name = 'compras';");
+    } catch (\Exception $e) {}
+    $db->exec("INSERT OR REPLACE INTO configuracoes_sistema (chave, valor) VALUES ('seed_executado', '1');");
+    $db->exec("INSERT OR REPLACE INTO configuracoes_sistema (chave, valor) VALUES ('banco_limpo', '1');");
+
+    $_SESSION['flash_msg'] = "🗑️ Todos os registros foram apagados com sucesso! O banco de dados está zerado.";
+    $_SESSION['flash_type'] = 'info';
+    header("Location: {$baseUrl}?unidade=0&tab=records");
+    exit;
+}
+
 // 4. ROTA POST: CADASTRAR COMPRA / BOLETOS PARCELADOS
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'salvar_compra') {
     $estabelecimento_id = (int)($_POST['estabelecimento_id'] ?? 0);
@@ -369,30 +384,6 @@ if ($action === 'exportar_csv') {
     exit;
 }
 
-// 6. ROTA POST: MODO TESTE (ZERAR BANCO OU RESTAURAR)
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'zerar_db') {
-    $db->exec("DELETE FROM compras;");
-    try {
-        $db->exec("DELETE FROM sqlite_sequence WHERE name='compras';");
-    } catch (Exception $e) {}
-    $_SESSION['flash_msg'] = "✅ Banco de dados zerado com sucesso! Todos os registros foram apagados.";
-    $_SESSION['flash_type'] = 'success';
-    header("Location: {$baseUrl}?unidade=0&view=painel");
-    exit;
-}
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'restaurar_db') {
-    $db->exec("DELETE FROM compras;");
-    try {
-        $db->exec("DELETE FROM sqlite_sequence WHERE name='compras';");
-    } catch (Exception $e) {}
-    inserirMassaInicial($db);
-    $_SESSION['flash_msg'] = "✅ Dados de demonstração restaurados com sucesso!";
-    $_SESSION['flash_type'] = 'success';
-    header("Location: {$baseUrl}?unidade=0&view=painel");
-    exit;
-}
-
 // -----------------------------------------------------------------------------
 // CONSULTA DE DADOS PARA A INTERFACE
 // -----------------------------------------------------------------------------
@@ -473,6 +464,14 @@ unset($_SESSION['flash_msg'], $_SESSION['flash_type'], $_SESSION['flash_erro']);
 
         <!-- CABEÇALHO DO SISTEMA -->
         <header class="text-center pt-2 pb-4 relative">
+            <div class="absolute right-0 top-2 flex items-center gap-2">
+                <form method="POST" action="<?= $baseUrl ?>?action=zerar_db" onsubmit="return confirm('Tem certeza que deseja apagar todos os registros de compras?');" class="inline">
+                    <button type="submit" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-red-950/40 border border-red-500/40 text-red-300 hover:bg-red-900/50 hover:text-white transition shadow-sm" title="Zerar todos os registros de compras">
+                        <span>🗑️</span>
+                        <span>Zerar Dados</span>
+                    </button>
+                </form>
+            </div>
             <h1 class="text-4xl sm:text-5xl md:text-6xl font-black tracking-widest uppercase brand-gradient mb-1">CARLÃO</h1>
             <div class="text-slate-400 text-xs sm:text-sm font-semibold tracking-widest uppercase mb-5">
                 SISTEMA INTEGRADO DE GESTÃO DE COMPRAS
@@ -956,10 +955,18 @@ unset($_SESSION['flash_msg'], $_SESSION['flash_type'], $_SESSION['flash_erro']);
                 <div class="space-y-4">
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <h3 class="text-lg font-extrabold text-slate-100">📋 Movimentações & Boletos Registrados</h3>
-                        <a href="<?= $baseUrl ?>?action=exportar_csv&unidade=<?= $unidadeAtual ?>" 
-                           class="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition">
-                            📥 Exportar Planilha (CSV)
-                        </a>
+                        <div class="flex items-center gap-2">
+                            <form method="POST" action="<?= $baseUrl ?>?action=zerar_db" onsubmit="return confirm('Tem certeza que deseja apagar todos os registros de compras?');" class="inline">
+                                <button type="submit" class="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl font-bold text-xs bg-red-950/40 border border-red-500/40 text-red-300 hover:bg-red-900/50 hover:text-white transition shadow-sm" title="Zerar todos os registros de compras">
+                                    <span>🗑️</span>
+                                    <span>Zerar Dados</span>
+                                </button>
+                            </form>
+                            <a href="<?= $baseUrl ?>?action=exportar_csv&unidade=<?= $unidadeAtual ?>" 
+                               class="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition">
+                                📥 Exportar Planilha (CSV)
+                            </a>
+                        </div>
                     </div>
 
                     <div class="overflow-x-auto border border-[#1E293B] rounded-xl bg-[#0F172A]">
